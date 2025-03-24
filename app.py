@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog
-import wave
+# import wave
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.io import wavfile
@@ -112,8 +112,8 @@ class AudioApp:
         self.parameters_button = tk.Button(self.clip_analysis_frame, text="Parametry klipu", command=self.show_parameters, state=tk.DISABLED)
         self.parameters_button.pack(pady=5, padx=10, side=tk.TOP, fill='x')
 
-        self.classification_button = tk.Button(self.clip_analysis_frame, text="Klasyfikacja", command=self.plot_classification, state=tk.DISABLED)
-        self.classification_button.pack(pady=5, padx=10, side=tk.TOP, fill='x')
+        # self.classification_button = tk.Button(self.clip_analysis_frame, text="Klasyfikacja", command=self.plot_classification, state=tk.DISABLED)
+        # self.classification_button.pack(pady=5, padx=10, side=tk.TOP, fill='x')
 
         # canvas
 
@@ -185,7 +185,9 @@ class AudioApp:
             label = tk.Label(self.params_label_frame, text=f"{key}:")
             label.pack(pady=5, anchor='e')
 
-            param = tk.Label(self.params_value_frame, text=f"{round(value, 4)}")
+            if not isinstance(value, str):
+                value = round(float(value), 4)
+            param = tk.Label(self.params_value_frame, text=f"{value}")
             param.pack(pady=5, anchor='w')
 
         self.params_window.transient(self.root)
@@ -321,9 +323,6 @@ class AudioApp:
         plt.grid()
         plt.tight_layout()
         plt.show()
-
-    def plot_classification(self):
-        pass
 
     def plot_voicing(self):
         

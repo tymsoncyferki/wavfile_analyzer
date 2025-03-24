@@ -26,7 +26,7 @@ class FileAnalyzer:
         """
         if len(data.shape) > 1:
             data = np.mean(data, axis=1)
-        return data
+        return data.astype(np.float32)
 
     def waveform(self) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -197,6 +197,16 @@ class FileAnalyzer:
         
         return vu_value
 
+    def rhythm_index(self):
+        energy, _ = self.ste()
+
+        peaks, _ = find_peaks(energy, height=np.mean(energy))
+        intervals = np.diff(peaks)
+
+        rhythm_score = 1.0 / (np.std(intervals) + 1e-6)
+        return rhythm_score
+    
+
     ## ENERGY BASED
 
     def lster(self):
@@ -231,14 +241,14 @@ class FileAnalyzer:
         sigmas = []
         for i in range(0, len(self.data), self.frame_size):
             frame_data = self.data[i:i+self.frame_size]
-            frame_ste = np.mean(frame_data**2)
+            frame_ste = np.mean(frame_data**2) + 0.001
 
             for k in range(0, len(frame_data), K):
                 segment_data = frame_data[k:k+K]
                 segment_ste = np.mean(segment_data**2) / frame_ste
                 sigmas.append(segment_ste)
 
-        entropy = -np.sum([sigma * np.log2(sigma) for sigma in sigmas])
+        entropy = -np.sum([sigma * np.log2(sigma + 0.001) for sigma in sigmas])
 
         return entropy
 
@@ -247,6 +257,10 @@ class FileAnalyzer:
     def zstd(self):
         zcr, _ = self.zcr()
         return np.std(zcr)
+    
+    def meanzcr(self):
+        zcr, _ = self.zcr()
+        return np.mean(zcr)
     
     def hzcrr(self):
         zcr, time = self.zcr()
@@ -271,10 +285,24 @@ class FileAnalyzer:
 
         return zcr_value
     
+    def classify_audio(self):
+        lster = self.lster()
+        zcr_mean = self.meanzcr()
+        zcr_std = self.zstd()
+        rhythm = self.rhythm_index()
+        if np.sum([(lster > 0.3), (zcr_mean > 0.05), (rhythm < 0.3)]) == 2:  # type: ignore
+            return "speech"
+        elif np.sum([(lster < 0.1), (zcr_mean < 0.03), (rhythm > 0.6)]) == 2:  # type: ignore
+            return "music"
+        elif zcr_std > 0.05:
+            return "speech"
+        return "unknown"
+
     # OTHER
 
     def calculate_parameters(self):
         params = {}
+        params['Audio type'] = self.classify_audio()
         params['Mean Volume'] = self.mv()
         params['Volume STD'] = self.vstd()
         params['Volume Dynamic Range'] = self.vdr()
@@ -282,6 +310,8 @@ class FileAnalyzer:
         params['Low STE Ratio'] = self.lster()
         params['Energy Entropy'] = self.energy_entropy()
         params['ZCR STD'] = self.zstd()
+        params['ZCR Mean'] = self.meanzcr()
         params['Silent Ratio'] = self.silent_ratio()
         params['High ZCR Ratio'] = self.hzcrr()
+        params['Rhythm index'] = self.rhythm_index()
         return params        
