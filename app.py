@@ -350,6 +350,8 @@ class AudioApp:
         # (un)voiced segments
         delta = time[1] - time[0]
         for t, label in zip(time, labels):
+            if label == 'ambiguous':
+                continue
             t_start = t
             t_end = t_start + delta
             plt.axvspan(t_start, t_end, color=color_map.get(label), alpha=0.4)

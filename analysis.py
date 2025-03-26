@@ -18,7 +18,8 @@ class FileAnalyzer:
         self.frame_size = int(Config.FRAME_SIZE * self.sample_rate)
         self.length = len(self.data) / self.sample_rate
 
-    def to_mono(self, data) -> np.ndarray:
+    @staticmethod
+    def to_mono(data) -> np.ndarray:
         """
         Converts dual channel audio to mono
         
@@ -234,19 +235,6 @@ class FileAnalyzer:
         
         return vu_value
 
-    def rhythm_index(self) -> float:
-        """
-        Calculates rhythm index
-        """
-        energy, _ = self.ste()
-
-        peaks, _ = find_peaks(energy, height=np.mean(energy))
-        intervals = np.diff(peaks)
-
-        rhythm_score = 1.0 / (np.std(intervals) + 1e-6)
-        return rhythm_score
-    
-
     ## ENERGY BASED
 
     def lster(self) -> float:
@@ -294,6 +282,18 @@ class FileAnalyzer:
         entropy = -np.sum([sigma * np.log2(sigma + 0.001) for sigma in sigmas])
 
         return entropy
+
+    def rhythm_index(self) -> float:
+        """
+        Calculates rhythm index
+        """
+        energy, _ = self.ste()
+
+        peaks, _ = find_peaks(energy, height=np.mean(energy))
+        intervals = np.diff(peaks)
+
+        rhythm_score = 1.0 / (np.std(intervals) + 1e-6)
+        return rhythm_score
 
     ## ZCR BASED
 
@@ -343,14 +343,14 @@ class FileAnalyzer:
         """
         lster = self.lster()
         zcr_mean = self.meanzcr()
-        zcr_std = self.zstd()
+        # zcr_std = self.zstd()
         rhythm = self.rhythm_index()
         if np.sum([(lster > 0.3), (zcr_mean > 0.05), (rhythm < 0.3)]) == 2:  # type: ignore
             return "speech"
         elif np.sum([(lster < 0.1), (zcr_mean < 0.03), (rhythm > 0.6)]) == 2:  # type: ignore
             return "music"
-        elif zcr_std > 0.05:
-            return "speech"
+        # elif zcr_std > 0.05:
+        #     return "speech"
         return "unknown"
 
     # OTHER
