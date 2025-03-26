@@ -1,9 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog
-# import wave
-import numpy as np
 import matplotlib.pyplot as plt
-from scipy.io import wavfile
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import pandas as pd
 
@@ -43,9 +40,9 @@ class AudioApp:
         menu.add_cascade(label="Plik", menu=file_menu)
         file_menu.add_command(label="Wyjście", command=self.on_closing)
 
-        help_menu = tk.Menu(menu)
-        help_menu.add_command(label="O aplikacji", command=lambda x: print("o aplikacji"))
-        menu.add_cascade(label="Pomoc", menu=help_menu)
+        # help_menu = tk.Menu(menu)
+        # help_menu.add_command(label="O aplikacji", command=lambda x: print("o aplikacji"))
+        # menu.add_cascade(label="Pomoc", menu=help_menu)
 
         root.config(menu=menu)
 
@@ -150,7 +147,7 @@ class AudioApp:
                     child.configure(state=tk.NORMAL)
     
     def draw_waveform(self):
-        ax = self.fig.gca()  # Clear the previous plot
+        ax = self.fig.gca()
         ax.clear()
 
         data, time = self.analyzer.waveform()
@@ -186,7 +183,7 @@ class AudioApp:
             label.pack(pady=5, anchor='e')
 
             if not isinstance(value, str):
-                value = round(float(value), 4)
+                value = round(float(value), 3)
             param = tk.Label(self.params_value_frame, text=f"{value}")
             param.pack(pady=5, anchor='w')
 
@@ -202,6 +199,7 @@ class AudioApp:
         self.frame_size_var = tk.StringVar(value=str(int(Config.FRAME_SIZE * 1000)))
         self.min_f0_var = tk.StringVar(value=str(Config.MIN_F0))
         self.max_f0_var = tk.StringVar(value=str(Config.MAX_F0))
+        self.entropy_k_var = tk.StringVar(value=str(Config.ENTROPY_K))
 
         tk.Label(self.config_window, text="Rozmiar ramki (ms):").pack(pady=5)
         tk.Entry(self.config_window, textvariable=self.frame_size_var).pack()
@@ -212,6 +210,9 @@ class AudioApp:
         tk.Label(self.config_window, text="Maks. F0 (hz):").pack(pady=5)
         tk.Entry(self.config_window, textvariable=self.max_f0_var).pack()
 
+        tk.Label(self.config_window, text="Rozmiar segmentu K (w entropii energii):").pack(pady=5)
+        tk.Entry(self.config_window, textvariable=self.entropy_k_var).pack()
+
         tk.Button(self.config_window, text="Zapisz", command=self.save_config).pack(pady=15)
 
 
@@ -220,6 +221,7 @@ class AudioApp:
             Config.FRAME_SIZE = int(self.frame_size_var.get()) / 1000
             Config.MIN_F0 = int(self.min_f0_var.get())
             Config.MAX_F0 = int(self.max_f0_var.get())
+            Config.ENTROPY_K = int(self.entropy_k_var.get())
             if self.filepath is not None:
                 try:
                     self.analyzer = FileAnalyzer(self.filepath)
@@ -299,12 +301,14 @@ class AudioApp:
 
     def plot_f0_cor(self):
         f0_corr, time_corr = self.analyzer.f0(method='cor')
+        mean, median, mode = self.analyzer.get_stats(f0_corr)
 
         plt.figure(figsize=(10, 4))
         plt.plot(time_corr, f0_corr)
         plt.xlabel("Czas [s]")
         plt.ylabel("f0 [Hz]")
-        plt.title("Częstotliwość tonu podstawowego - Autokorelacja")
+        plt.suptitle("Częstotliwość tonu podstawowego - Autokorelacja")
+        plt.title(f"Średnia: {mean:.1f}, Mediana: {median:.1f}, Moda: {mode:.1f}")
         plt.legend()
         plt.grid()
 
@@ -313,12 +317,14 @@ class AudioApp:
 
     def plot_f0_amdf(self):
         f0_amdf, time_amdf = self.analyzer.f0(method='amdf')
+        mean, median, mode = self.analyzer.get_stats(f0_amdf)
 
         plt.figure(figsize=(10, 4))
         plt.plot(time_amdf, f0_amdf)
         plt.xlabel("Czas [s]")
         plt.ylabel("f0 [Hz]")
-        plt.title("Częstotliwość tonu podstawowego - AMDF")
+        plt.suptitle("Częstotliwość tonu podstawowego - AMDF")
+        plt.title(f"Średnia: {mean:.1f}, Mediana: {median:.1f}, Moda: {mode:.1f}")
         plt.legend()
         plt.grid()
         plt.tight_layout()

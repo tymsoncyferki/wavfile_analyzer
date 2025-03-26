@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.io import wavfile
+from scipy import stats
 from config import Config
 from scipy.signal import find_peaks
 
@@ -30,7 +31,7 @@ class FileAnalyzer:
 
     def waveform(self) -> tuple[np.ndarray, np.ndarray]:
         """
-        Returns wave amplitudes and coresponding clip time
+        Returns wave amplitudes and corresponding clip time
         
         Returns:
             tuple[np.ndarray, np.ndarray]: data, time
@@ -41,7 +42,7 @@ class FileAnalyzer:
 
     def volume(self) -> tuple[np.ndarray, np.ndarray]:
         """
-        Calculates frames volume and coresponding clip time
+        Calculates frames volume and corresponding clip time
         
         Returns:
             tuple[np.ndarray, np.ndarray]: volume, time
@@ -53,7 +54,7 @@ class FileAnalyzer:
 
     def ste(self) -> tuple[np.ndarray, np.ndarray]:
         """
-        Calculates frames short time    energy and coresponding clip time
+        Calculates frames short time energy and corresponding clip time
         
         Returns:
             tuple[np.ndarray, np.ndarray]: energy, time
@@ -68,14 +69,21 @@ class FileAnalyzer:
         Calculates frames zero crossing rate
         
         Returns:
-            np.ndarray: zcr, time
+            tuple[np.ndarray, np.ndarray]: zcr, time
         """
         zcr = [np.sum(np.abs(np.diff(np.sign(self.data[i:i+self.frame_size])))) / (2 * self.frame_size) for i in range(0, len(self.data), self.frame_size)]
         time = np.linspace(0, self.length, num=len(zcr))
 
         return zcr, time
     
-    def silence(self):    
+    def silence(self) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Checks for silent frames.
+        Returns array with value True (or 1) if the frame is silent.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: silence, time
+        """
         volume, time = self.volume()
         zcr, _ = self.zcr()
         
@@ -86,18 +94,23 @@ class FileAnalyzer:
         
         return silence, time
     
-    def silent_ratio(self):
+    def silent_ratio(self) -> float:
+        """
+        Calculates silent ratio
+
+        Returns:
+            np.float: silent ratio value
+        """
         silence, _ = self.silence()
         return np.mean(silence)
-    
-    def amdf(self, l):
-        
-        amdf = [np.sum(np.abs(np.diff(self.data[i:i+self.frame_size], l))) for i in range(0, len(self.data), self.frame_size)]    
-        time = np.linspace(0, self.length, num=len(amdf))
 
-        return amdf, time
+    def f0_frame_autocor(self, signal) -> float:
+        """
+        Calculates f0 using autocorrelation method for given frame
 
-    def f0_frame_autocor(self, signal):
+        Returns:
+            float: frame f0
+        """
         result = np.correlate(signal, signal, mode='full')
         corr = result[result.size // 2:]  # bierzemy tylko drugą połowę bez laga równego zero
 
@@ -112,8 +125,13 @@ class FileAnalyzer:
         f0 = self.sample_rate / lag if lag != 0 else 0
         return f0
 
-    def f0_frame_amdf(self, signal):
-        N = len(signal)
+    def f0_frame_amdf(self, signal) -> float:
+        """
+        Calculates f0 using amdf method for given frame
+
+        Returns:
+            float: frame f0
+        """
         min_lag = int(self.sample_rate / Config.MAX_F0)  # max F0 = 500 Hz
         max_lag = int(self.sample_rate / Config.MIN_F0)   # min F0 = 50 Hz
 
@@ -127,18 +145,34 @@ class FileAnalyzer:
         f0 = self.sample_rate / lag if lag != 0 else 0
         return f0
 
-    def f0(self, method: str = 'cor'):
+    def f0(self, method: str = 'cor') -> tuple[np.ndarray, np.ndarray]:
+        """
+        Calculates fundamental frequency. 
+        Available methods: ['cor', 'amdf']
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: f0, time
+        """
         if method == 'cor':
             fmethod = self.f0_frame_autocor
         elif method == 'amdf':
             fmethod = self.f0_frame_amdf
+        else:
+            raise ValueError("method should be in ['cor', 'amdf']")
         
         f0 = [fmethod(self.data[i:i+self.frame_size]**2) for i in range(0, len(self.data), self.frame_size)]
         time = np.linspace(0, self.length, num=len(f0))
 
         return f0, time
 
-    def voicing(self):
+    def voicing(self) -> tuple[list[str], np.ndarray]:
+        """
+        Calculates voicing of the frames.
+        Returns array with 3 values: 'voiced', 'unvoiced' and 'ambigious'
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: labels, time
+        """
         zcr, time = self.zcr()
         ste, _ = self.ste()
         
@@ -161,7 +195,10 @@ class FileAnalyzer:
 
     ## VOLUME BASED PARAMETERS 
     
-    def mv(self):
+    def mv(self) -> float:
+        """
+        Calculates mean volume
+        """
         volume, _ = self.volume()
         return np.mean(volume)
 
@@ -174,14 +211,14 @@ class FileAnalyzer:
         std_vol = np.std(volume)
         return std_vol / max_vol
     
-    def vdr(self):
+    def vdr(self) -> float:
         """
         Calculates Volume Dynamic Range
         """
         volume, _ = self.volume()
         return (np.max(volume) - np.min(volume)) / np.max(volume)
 
-    def vu(self):
+    def vu(self) -> float:
         """
         Calculates Volume Undulation
         """
@@ -197,7 +234,10 @@ class FileAnalyzer:
         
         return vu_value
 
-    def rhythm_index(self):
+    def rhythm_index(self) -> float:
+        """
+        Calculates rhythm index
+        """
         energy, _ = self.ste()
 
         peaks, _ = find_peaks(energy, height=np.mean(energy))
@@ -209,7 +249,7 @@ class FileAnalyzer:
 
     ## ENERGY BASED
 
-    def lster(self):
+    def lster(self) -> float:
         """
         Calculates Low STE Rate (LSTER)
         """
@@ -236,8 +276,11 @@ class FileAnalyzer:
         return lster_value
 
     
-    def energy_entropy(self, K=100):
-    
+    def energy_entropy(self):
+        """
+        Calculates energy entropy
+        """
+        K = Config.ENTROPY_K
         sigmas = []
         for i in range(0, len(self.data), self.frame_size):
             frame_data = self.data[i:i+self.frame_size]
@@ -254,15 +297,24 @@ class FileAnalyzer:
 
     ## ZCR BASED
 
-    def zstd(self):
+    def zstd(self) -> float:
+        """
+        Calculates standard devation of ZCR
+        """
         zcr, _ = self.zcr()
         return np.std(zcr)
     
-    def meanzcr(self):
+    def meanzcr(self) -> float:
+        """
+        Calculates mean ZCR value
+        """
         zcr, _ = self.zcr()
         return np.mean(zcr)
     
-    def hzcrr(self):
+    def hzcrr(self) -> float:
+        """
+        Calcualates HZCRR
+        """
         zcr, time = self.zcr()
         N = len(zcr)
         
@@ -270,7 +322,6 @@ class FileAnalyzer:
         frames_in_1s = int(1.0 / frame_step)
 
         count = 0
-
         for n in range(N):
             # window: n - half_window to n + half_window
             half_window = frames_in_1s // 2
@@ -278,14 +329,18 @@ class FileAnalyzer:
             end = min(N, n + half_window + 1)
             
             av_zcr = np.mean(zcr[start:end])
-
             count += np.sign(zcr[n] - 1.5 * av_zcr) + 1
 
         zcr_value = count / (2 * N)
-
         return zcr_value
     
     def classify_audio(self):
+        """
+        Classifies audio into speech and music based on heuristics.
+        
+        Returns:
+            str: audio type 'speech', 'music' or 'unknown'
+        """
         lster = self.lster()
         zcr_mean = self.meanzcr()
         zcr_std = self.zstd()
@@ -314,4 +369,14 @@ class FileAnalyzer:
         params['Silent Ratio'] = self.silent_ratio()
         params['High ZCR Ratio'] = self.hzcrr()
         params['Rhythm index'] = self.rhythm_index()
-        return params        
+        return params
+    
+    @staticmethod
+    def get_stats(array):
+        """
+        Calculates mean, median, mode
+        """
+        mean = np.mean(array)
+        median = np.median(array)
+        mode = stats.mode(array)[0]
+        return mean, median, mode
