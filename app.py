@@ -222,6 +222,13 @@ class AudioApp:
             Config.MIN_F0 = int(self.min_f0_var.get())
             Config.MAX_F0 = int(self.max_f0_var.get())
             Config.ENTROPY_K = int(self.entropy_k_var.get())
+
+            if Config.MIN_F0 == 0:
+                Config.MIN_F0 += 1
+            if Config.MAX_F0 == 0:
+                Config.MAX_F0 += 1
+            assert Config.MAX_F0 >= Config.MIN_F0
+
             if self.filepath is not None:
                 try:
                     self.analyzer = FileAnalyzer(self.filepath)
@@ -229,7 +236,7 @@ class AudioApp:
                     print(e)
             tk.messagebox.showinfo("", "Parametry zostały zapisane")
             self.config_window.destroy()
-        except ValueError as e:
+        except (ValueError, AssertionError) as e:
             print(e)
             tk.messagebox.showerror("Błąd", "Wprowadzono niepoprawne wartości liczbowe")
 

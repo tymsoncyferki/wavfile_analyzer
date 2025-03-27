@@ -339,19 +339,17 @@ class FileAnalyzer:
         Classifies audio into speech and music based on heuristics.
         
         Returns:
-            str: audio type 'speech', 'music' or 'unknown'
+            str: audio type 'speech', 'music' or 'other'
         """
         lster = self.lster()
-        zcr_mean = self.meanzcr()
-        # zcr_std = self.zstd()
+        zcr_std = self.zstd()
         rhythm = self.rhythm_index()
-        if np.sum([(lster > 0.3), (zcr_mean > 0.05), (rhythm < 0.3)]) == 2:  # type: ignore
+        if np.sum([(lster > 0.3), (zcr_std > 0.07), (rhythm < 0.3)]) >= 2:  # type: ignore
             return "speech"
-        elif np.sum([(lster < 0.1), (zcr_mean < 0.03), (rhythm > 0.6)]) == 2:  # type: ignore
+        elif np.sum([(lster < 0.2), (zcr_std < 0.04), (rhythm > 0.4)]) >= 2:  # type: ignore
             return "music"
-        # elif zcr_std > 0.05:
-        #     return "speech"
-        return "unknown"
+        return 'other'
+        
 
     # OTHER
 
