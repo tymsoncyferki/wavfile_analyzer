@@ -75,7 +75,7 @@ class AudioApp:
         self.frame_label = tk.Label(self.frame_analysis_frame, text="Analiza ramek - wykresy")
         self.frame_label.pack(pady=5, padx=10)
 
-        self.energy_button = tk.Button(self.frame_analysis_frame, text="Energia", command=self.plot_energy, state=tk.DISABLED)
+        self.energy_button = tk.Button(self.frame_analysis_frame, text="Amplituda", command=self.plot_waveform_freq, state=tk.DISABLED)
         self.energy_button.pack(pady=5, padx=10, side=tk.TOP, fill='x')
         
         self.zcr_button = tk.Button(self.frame_analysis_frame, text="Współczynnik ZCR", command=self.plot_zcr, state=tk.DISABLED)
@@ -241,14 +241,15 @@ class AudioApp:
             tk.messagebox.showerror("Błąd", "Wprowadzono niepoprawne wartości liczbowe")
 
 
-    def plot_energy(self):
-        energy, time = self.analyzer.ste()
+    def plot_waveform_freq(self):
+        energy, time = self.analyzer.waveform_freq()
         
         plt.figure(figsize=(10, 4))
-        plt.plot(time, energy, label="Energia sygnału na poziomie ramek")
-        plt.xlabel("Czas [s]")
-        plt.ylabel("Energia")
-        plt.title("Energia sygnału na poziomie ramek")
+        plt.plot(time, energy)
+        plt.xlabel("Częstotliwość [Hz]")
+        plt.ylabel("Amplituda")
+        plt.title("Amplituda sygnału na poziomie klipu")
+        plt.xscale('log')
         plt.legend()
         plt.grid()
         plt.show()

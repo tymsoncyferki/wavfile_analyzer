@@ -6,16 +6,18 @@ from scipy.signal import find_peaks
 
 class FileAnalyzer:
 
-    filepath: str
     sample_rate: int
     data_raw: np.ndarray
     data: np.ndarray
     frame_size: int
+    frames: list
+    length: float
 
     def __init__(self, filepath):
         self.sample_rate, self.data_raw = wavfile.read(filepath)
         self.data = self.to_mono(self.data_raw)
         self.frame_size = int(Config.FRAME_SIZE * self.sample_rate)
+        self.frames = [self.data[i:i+self.frame_size] for i in range(0, len(self.data), self.frame_size)][:-1]
         self.length = len(self.data) / self.sample_rate
 
     @staticmethod
@@ -41,17 +43,50 @@ class FileAnalyzer:
         
         return self.data, time
 
-    def volume(self) -> tuple[np.ndarray, np.ndarray]:
+    def fft(self, signal=False):
         """
-        Calculates frames volume and corresponding clip time
-        
+        Computes the FFT of each frame in the input.
+
         Returns:
-            tuple[np.ndarray, np.ndarray]: volume, time
+            spectrum (np.ndarray): A 2D array of FFT results for each frame.
         """
-        energy, time = self.ste()
-        volume = np.sqrt(energy)
+        if not signal:
+            return np.fft.fft(self.frames, axis=1)      
+        else:
+            return np.fft.fft(self.data)      
+
+
+    def freq(self, n):
+        return np.fft.fftfreq(n, d=1/self.sample_rate)
+
+    def waveform_freq(self):
+        """
         
+        """
+        n = len(self.data)
+        fft = np.abs(self.fft(signal=True)) / n
+        freqs = self.freq(len(fft))
+        half_n = n // 2
+        freqs = freqs[:half_n]
+        fft = fft[:half_n]
+        return fft, freqs
+
+    def volume(self):
+        """
+        Calculates the volume for each frame using the power of the FFT spectrum.
+
+        Parameters:
+            frames (np.ndarray): A 2D array where each row is a signal frame.
+
+        Returns:
+            volumes (np.ndarray): A 1D array with the volume for each frame.
+        """
+        spectra = self.fft()
+        power_spectrum = np.abs(spectra) ** 2
+        volume = np.mean(power_spectrum, axis=1)
+        time = np.linspace(0, self.length, num=len(volume))
         return volume, time
+
 
     def ste(self) -> tuple[np.ndarray, np.ndarray]:
         """
