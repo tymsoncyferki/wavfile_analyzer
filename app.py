@@ -78,7 +78,7 @@ class AudioApp:
         self.energy_button = tk.Button(self.frame_analysis_frame, text="Amplituda", command=self.plot_waveform_freq, state=tk.DISABLED)
         self.energy_button.pack(pady=5, padx=10, side=tk.TOP, fill='x')
         
-        self.zcr_button = tk.Button(self.frame_analysis_frame, text="Współczynnik ZCR", command=self.plot_zcr, state=tk.DISABLED)
+        self.zcr_button = tk.Button(self.frame_analysis_frame, text="Funkcje okna", command=self.window_analysis_window, state=tk.DISABLED)
         self.zcr_button.pack(pady=5, padx=10, side=tk.TOP, fill='x')
 
         self.volume_button = tk.Button(self.frame_analysis_frame, text="Głośność", command=self.plot_volume, state=tk.DISABLED)
@@ -190,6 +190,10 @@ class AudioApp:
         self.params_window.transient(self.root)
         self.params_window.grab_set()
     
+    def window_analysis_window(self):
+        FrameAnalysisWindow(self.root, self.analyzer)
+
+
     def show_settings(self):
         self.config_window = tk.Toplevel(self.root, padx=40, pady=10)
         self.config_window.title("Ustawienia parametrów")
@@ -400,6 +404,114 @@ class AudioApp:
             params['voicing'], _ = self.analyzer.voicing()
             params['f0'], _ = self.analyzer.f0(method='cor')
             return pd.DataFrame(params)
+
+
+import tkinter as tk
+from tkinter import ttk
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+from scipy.signal.windows import get_window  # do obsługi różnych okien
+
+class FrameAnalysisWindow:
+    def __init__(self, master, analyzer: FileAnalyzer):
+        self.analyzer = analyzer
+        self.frame_index = 0
+        self.window_type = 'hann'
+
+        self.window = tk.Toplevel(master)
+        self.window.title("Analiza wybranej ramki")
+
+        self.create_widgets()
+        self.update_plots()
+
+    def create_widgets(self):
+        # Dropdown do wyboru okna
+        window_label = tk.Label(self.window, text="Funkcja okna:")
+        window_label.pack()
+        
+        self.window_options = ['boxcar', 'triang', 'hamming', 'hann', 'blackman']
+        self.window_dropdown = ttk.Combobox(self.window, values=self.window_options)
+        self.window_dropdown.set(self.window_type)
+        self.window_dropdown.bind("<<ComboboxSelected>>", self.on_window_change)
+        self.window_dropdown.pack()
+
+        # Suwak do wyboru ramki
+        # self.slider = tk.Scale(self.window, from_=0, to=len(self.analyzer.frames()) - 1,
+        #                        orient=tk.HORIZONTAL, label="Numer ramki", command=self.on_slider_change)
+        # self.slider.pack(fill='x', padx=10, pady=5)
+                # Start and End frame sliders
+        self.start_slider = tk.Scale(self.window, from_=0, to=len(self.analyzer.frames()) - 2,
+                                     orient=tk.HORIZONTAL, label="Start ramki", command=self.on_slider_change)
+        self.start_slider.pack(fill='x', padx=10)
+
+        self.end_slider = tk.Scale(self.window, from_=1, to=len(self.analyzer.frames()) - 1,
+                                   orient=tk.HORIZONTAL, label="Koniec ramki", command=self.on_slider_change)
+        self.end_slider.set(len(self.analyzer.frames()) - 1)
+        self.end_slider.pack(fill='x', padx=10)
+
+        self.selected_range = (0, len(self.analyzer.frames())-1)
+
+        # Matplotlib - tworzenie figury
+        self.fig, (self.ax_time, self.ax_freq) = plt.subplots(2, 1, figsize=(6, 5))
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
+        self.canvas_widget = self.canvas.get_tk_widget()
+        self.canvas_widget.pack()
+
+    def on_window_change(self, event):
+        self.window_type = self.window_dropdown.get()
+        self.update_plots()
+
+    def on_slider_change(self, value):
+        start = self.start_slider.get()
+        end = self.end_slider.get()
+        if end <= start:
+            if self.last_end != end:
+                start = end - 1
+                self.start_slider.set(start)
+            else:
+                end = start + 1
+                self.end_slider.set(end)
+        self.frame_index = start  # could still use first frame in range
+        self.selected_range = (start, end)
+        self.last_end = end
+        self.update_plots()
+
+    def update_plots(self):
+        start, end = self.selected_range
+        frames = self.analyzer.frames()[start:end]
+        frame = np.array(frames).flatten()
+        fs = self.analyzer.sample_rate
+        N = len(frame)
+
+        windowed_frame = self.analyzer.apply_window(frame, self.window_type)
+        # Zastosowanie okna
+        fft_result, freqs = self.analyzer.waveform_freq(windowed_frame)
+        
+        # FFT
+
+        # Czyszczenie i rysowanie wykresów
+        self.ax_time.clear()
+        self.ax_freq.clear()
+
+        time_axis = np.arange(N) / fs
+
+        self.ax_time.plot(time_axis, windowed_frame)
+        self.ax_time.set_title("Sygnał w dziedzinie czasu")
+        self.ax_time.set_xlabel("Czas [s]")
+        self.ax_time.set_ylabel("Amplituda")
+
+        self.ax_freq.plot(freqs, fft_result)
+        self.ax_freq.set_title("Widmo częstotliwościowe (FFT)")
+        self.ax_freq.set_xlabel("Częstotliwość [Hz]")
+        self.ax_freq.set_ylabel("Amplituda")
+        self.ax_freq.set_xscale('log')
+
+        self.fig.tight_layout()
+        self.canvas.draw()
+
+
 
 
 if __name__ == "__main__":

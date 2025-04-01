@@ -3,6 +3,7 @@ from scipy.io import wavfile
 from scipy import stats
 from config import Config
 from scipy.signal import find_peaks
+from scipy.signal.windows import get_window
 
 class FileAnalyzer:
 
@@ -10,14 +11,12 @@ class FileAnalyzer:
     data_raw: np.ndarray
     data: np.ndarray
     frame_size: int
-    frames: list
     length: float
 
     def __init__(self, filepath):
         self.sample_rate, self.data_raw = wavfile.read(filepath)
         self.data = self.to_mono(self.data_raw)
         self.frame_size = int(Config.FRAME_SIZE * self.sample_rate)
-        self.frames = [self.data[i:i+self.frame_size] for i in range(0, len(self.data), self.frame_size)][:-1]
         self.length = len(self.data) / self.sample_rate
 
     @staticmethod
@@ -32,6 +31,9 @@ class FileAnalyzer:
             data = np.mean(data, axis=1)
         return data.astype(np.float32)
 
+    def frames(self):
+        return [self.data[i:i+self.frame_size] for i in range(0, len(self.data), self.frame_size)][:-1]
+
     def waveform(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Returns wave amplitudes and corresponding clip time
@@ -43,28 +45,37 @@ class FileAnalyzer:
         
         return self.data, time
 
-    def fft(self, signal=False):
+    def fft(self, data=None, signal=False):
         """
         Computes the FFT of each frame in the input.
+
+        Args:
+            signal (bool): if to calculate it for the whole signal, otherwise does it for the frames
 
         Returns:
             spectrum (np.ndarray): A 2D array of FFT results for each frame.
         """
+        if data is None:
+            data = self.data
         if not signal:
-            return np.fft.fft(self.frames, axis=1)      
+            return np.fft.fft(self.frames(), axis=1)
         else:
-            return np.fft.fft(self.data)      
-
+            return np.fft.fft(data)      
 
     def freq(self, n):
+        """
+        Generates frequency data of length n
+        """
         return np.fft.fftfreq(n, d=1/self.sample_rate)
 
-    def waveform_freq(self):
+    def waveform_freq(self, data=None):
         """
         
         """
-        n = len(self.data)
-        fft = np.abs(self.fft(signal=True)) / n
+        if data is None:
+            data = self.data
+        n = len(data)
+        fft = np.abs(self.fft(data=data, signal=True)) / n
         freqs = self.freq(len(fft))
         half_n = n // 2
         freqs = freqs[:half_n]
@@ -87,6 +98,8 @@ class FileAnalyzer:
         time = np.linspace(0, self.length, num=len(volume))
         return volume, time
 
+    def spectral_centroid(self):
+        pass
 
     def ste(self) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -100,6 +113,14 @@ class FileAnalyzer:
         
         return energy, time
     
+    def apply_window(self, frame, method='hann'):
+        
+        N = len(frame)
+        window = get_window(method, N)
+        windowed_frame = frame * window
+        return windowed_frame
+
+
     def zcr(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates frames zero crossing rate
