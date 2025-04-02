@@ -1,0 +1,12 @@
+__pycache__
+.venv
+
+*.csv
+
+data/radio
+data/women
+data/man
+data/music
+data/sample
+test.ipynb
+example.wav
